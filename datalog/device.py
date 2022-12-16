@@ -8,7 +8,7 @@ from . import __version__
 logger = logging.getLogger("datalog")
 
 
-class Device(object, metaclass=abc.ABCMeta):
+class Device(metaclass=abc.ABCMeta):
     """Abstract DataLog device"""
 
     def __init__(self):

@@ -7,7 +7,7 @@ import datetime
 MAX_AMOUNT = 1000
 
 
-class Reading(object):
+class Reading:
     """Class to represent a device reading for a particular time. This contains
     the samples for each active channel in the ADC for a particular time."""
 
@@ -34,7 +34,7 @@ class Reading(object):
         self.reading_time = int(reading_time)
 
         # check channels and samples lists are same length
-        if len(channels) is not len(samples):
+        if len(channels) != len(samples):
             raise Exception("Specified channels is not the same length as "
                             "specified samples")
 
@@ -149,7 +149,7 @@ class Reading(object):
         for sample, new_value in zip(self.samples, output):
             sample.value = new_value
 
-class Sample(object):
+class Sample:
     """Class to represent a single sample of a single channel."""
 
     # channel number
@@ -179,7 +179,7 @@ class Sample(object):
 
         return {'channel': self.channel, 'value': self.value}
 
-class DataStore(object):
+class DataStore:
     """Class to store and retrieve ADC readings."""
 
     # default datastore size

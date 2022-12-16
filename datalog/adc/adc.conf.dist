@@ -1,6 +1,8 @@
 [device]
 sample_time = 3000
 conversion_time = 4
+# 4 channels * 4 samples in blocking mode (12 s)
+sample_buf_len = 16
 
 [adc]
 type = PicoLog24Sim

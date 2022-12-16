@@ -40,10 +40,10 @@ class Retriever(threading.Thread):
         # time in ms between polls
         poll_time = int(self.config['fetch']['poll_time'])
 
-        if poll_time < 1000:
-            # since the runner sleeps for 1s between checks, times less than
+        if poll_time < 500:
+            # since the runner sleeps for 0.5s between checks, times less than
             # 1 second aren't supported
-            raise ValueError("Poll times less than 1000 ms aren't supported")
+            raise ValueError("Poll times less than 500 ms aren't supported")
 
         self.poll_time = poll_time
         logger.info("Poll time: {0:.2f} ms".format(self.poll_time))
@@ -59,7 +59,8 @@ class Retriever(threading.Thread):
             raise Exception("Device is not open")
 
         # start streaming
-        self.adc.stream()
+        # NOTE(cmo): Updated to blocking for timestamping.
+        self.adc.block()
 
         # start time
         self.start_time = int(round(time.time() * 1000))
@@ -78,7 +79,7 @@ class Retriever(threading.Thread):
             if now < next_poll_time:
                 # sleep, but not for too long so that the thread exits quickly
                 # when asked
-                time.sleep(1)
+                time.sleep(0.5)
             else:
                 # fetch latest readings
                 self.fetch_readings()

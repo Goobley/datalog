@@ -86,6 +86,8 @@ class PicoLogAdc24(Adc):
         # default sample time
         self.sample_time = None
 
+        self.sample_method = None
+
         # load library
         self._load_library()
 
@@ -419,6 +421,8 @@ class PicoLogAdc24(Adc):
         if not SampleMethod.is_valid(sample_method):
             raise Exception("Invalid sample method")
 
+        self.sample_method = sample_method
+
         # set sample method
         self._c_sample_method.value = int(sample_method)
 
@@ -431,7 +435,7 @@ class PicoLogAdc24(Adc):
             # We only want sample_buf_len / num_channels, samples-per-channel
             # calculate number of values to collect for each channel
             self._samples_per_channel = (ctypes.c_long(int(self.config['device']['sample_buf_len']) // len(self.enabled_channels)))
-            
+
             status = self._hrdl_run(self.handle,
                                 self._samples_per_channel,
                                 self._c_sample_method)
@@ -454,7 +458,7 @@ class PicoLogAdc24(Adc):
     def block(self):
 
         logger.info("Starting unit in BLOCK mode")
-        
+
         # run
         self._run(SampleMethod.BLOCK)
 
@@ -466,6 +470,8 @@ class PicoLogAdc24(Adc):
 
         A reading is a full set of channel samples for a given time. This method
         returns a list of readings, in chronological order.
+
+        If the logger is running in blocking mode, set it running the next batch.
         """
 
         # get payload
@@ -491,6 +497,9 @@ class PicoLogAdc24(Adc):
 
             readings.append(Reading(real_time, ordered_channels, reading_data))
 
+        if self.sample_method == SampleMethod.BLOCK:
+            self.block()
+
         return readings
 
     def _get_payload(self):
@@ -500,13 +509,24 @@ class PicoLogAdc24(Adc):
         samples_per_channel = int(self.config['device']['sample_buf_len']) \
                             // len(self.enabled_channels)
 
-        # get samples, without using the overflow short parameter (None == NULL)
-        num_samples = self._hrdl_get_times_and_values(
-            self.handle,
-            ctypes.pointer(self._c_sample_times),
-            ctypes.pointer(self._c_sample_values),
-            None,
-            ctypes.c_long(samples_per_channel))
+        if self.sample_method == SampleMethod.STREAM:
+            # get samples, without using the overflow short parameter (None == NULL)
+            num_samples = self._hrdl_get_times_and_values(
+                self.handle,
+                ctypes.pointer(self._c_sample_times),
+                ctypes.pointer(self._c_sample_values),
+                None,
+                ctypes.c_long(samples_per_channel),
+            )
+        elif self.sample_method == SampleMethod.BLOCK:
+            num_samples = self._hrdl_get_values(
+                self.handle,
+                ctypes.pointer(self._c_sample_values),
+                None,
+                ctypes.c_long(samples_per_channel),
+            )
+        else:
+            raise ValueError(f'Invalid sample method {self.sample_method}')
 
         # check return status
         if num_samples == 0:
@@ -554,7 +574,10 @@ class PicoLogAdc24(Adc):
 
         # convert to list and return
         # NOTE: the conversion from c_long elements to ints is done by the slice operation
-        times = [int(i) for i in self._c_sample_times[:num_samples]]
+        if self.sample_method == SampleMethod.STREAM:
+            times = [int(i) for i in self._c_sample_times[:num_samples]]
+        else:
+            times = [int(i * self.sample_time) for i in range(num_samples)]
         values = [int(i) for i in self._c_sample_values[:num_values]]
 
         return times, values
@@ -623,13 +646,13 @@ class PicoLogAdc24(Adc):
         # return channel ADC counts
         return (int(self._c_minimum_count.value),
                 int(self._c_maximum_count.value))
-		
+
     def set_mains_rejection(self, sixty_hertz):
         return self._hrdl_set_mains(self.handle, ctypes.c_int16(sixty_hertz))
 
     def _hrdl_open(self):
         return int(self.lib.HRDLOpenUnit())
-        
+
     def _hrdl_stop(self, handle):
         return int(self.lib.HRDLStop(handle))
 
@@ -688,7 +711,7 @@ class PicoLogAdc24(Adc):
                                                   singleEnded,
                                                   pnt_overflow,
                                                   pnt_value))
-						  
+
     def _hrdl_set_mains(self, handle, sixty_hertz):
         return int(self.lib.HRDLSetMains(handle, sixty_hertz))
 
@@ -720,6 +743,7 @@ class PicoLogAdc24Sim(PicoLogAdc24):
 
         # default settings error
         self._settings_error_code = SettingsError.OK
+        self._num_block_samples = 1
 
         logger.warning("Fake PicoLog ADC24 in use")
         logger.debug("Fake library loaded")
@@ -768,6 +792,14 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         # set the time to use for readings
         self._last_fake_request_time = self.stream_start_timestamp
 
+    def block(self):
+        # call parent
+        super(PicoLogAdc24Sim, self).block()
+
+        # set the time to use for readings
+        self._last_fake_request_time = self.stream_start_timestamp
+        self._num_block_samples = int(self.config['device']['sample_buf_len']) // self.get_enabled_channels_count()
+
     def _hrdl_open(self):
         return 1
 
@@ -783,7 +815,7 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         # generate fake samples
         self._generate_fake_samples()
 
-        if self._fake_samples_time_buf:
+        if len(self._fake_samples_time_buf) >= self._num_block_samples:
             return 1
 
         return 0
@@ -899,10 +931,6 @@ class PicoLogAdc24Sim(PicoLogAdc24):
             self._settings_error_code = SettingsError.INVALID_PARAMETER
             return 0
 
-        # temporary: only support stream
-        if sample_method is not SampleMethod.STREAM:
-            raise Exception("Only streaming sample method currently supported")
-
         sample_buf_len = int(sample_buf_len.value)
 
         if sample_buf_len > self.MAX_BUF_LEN:
@@ -936,6 +964,32 @@ class PicoLogAdc24Sim(PicoLogAdc24):
         for i in range(samples_per_channel):
             # set sample time directly in the array
             self._c_sample_times[i] = ctypes.c_int32(times[i])
+            for j in range(n_channels):
+                idx = n_channels * i + j
+                # set sample value directly in the array
+                self._c_sample_values[idx] = values[i][j]
+
+            # increment sample counter
+            sample_count += 1
+
+        # reset buffers
+        self._fake_samples_time_buf = self._fake_samples_time_buf[samples_per_channel:]
+        self._fake_samples_value_buf = self._fake_samples_value_buf[idx+1:]
+
+        return sample_count
+
+    def _hrdl_get_values(self, handle,
+                          pnt_sample_values, pnt_overflow,
+                          samples_per_channel):
+        values = list(self._fake_samples_value_buf)
+
+        samples_per_channel = int(samples_per_channel.value)
+
+        # number of channels
+        n_channels = len(self.enabled_channels)
+
+        sample_count = 0
+        for i in range(samples_per_channel):
             for j in range(n_channels):
                 idx = n_channels * i + j
                 # set sample value directly in the array

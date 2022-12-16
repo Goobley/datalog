@@ -1,6 +1,6 @@
 """PicoLog ADC unit constants"""
 
-class Handle(object):
+class Handle:
     """Unit handle"""
 
     UNIT_NOT_OPENED = -1
@@ -21,7 +21,7 @@ class Handle(object):
 
         return False
 
-class Status(object):
+class Status:
     """Unit status"""
 
     INVALID = 0
@@ -37,12 +37,12 @@ class Status(object):
         :rtype: boolean
         """
 
-        if status is cls.VALID:
+        if status == cls.VALID:
             return True
 
         return False
 
-class Channel(object):
+class Channel:
     """Unit channels"""
 
     ANALOG_CHANNEL_1 = 1
@@ -77,7 +77,7 @@ class Channel(object):
         return channel >= cls.MIN_ANALOG_CHANNEL and \
         channel <= cls.MAX_ANALOG_CHANNEL
 
-class Info(object):
+class Info:
     """Unit info"""
 
     DRIVER_VERSION = 0
@@ -136,7 +136,7 @@ class Info(object):
 
         return cls.formats[info_type].format(info)
 
-class Error(object):
+class Error:
     """Unit errors"""
 
     OK = 0
@@ -185,7 +185,7 @@ class Error(object):
         # otherwise it's an error
         return True
 
-class SettingsError(object):
+class SettingsError:
     """Unit settings errors"""
 
     CONVERSION_TIME_OUT_OF_RANGE = 0
@@ -242,14 +242,14 @@ class SettingsError(object):
         # otherwise it's an error
         return True
 
-class Progress(object):
+class Progress:
     """Unit open progress"""
 
     OPEN_PROGRESS_FAIL = -1
     OPEN_PROGRESS_PENDING = 0
     OPEN_PROGRESS_COMPLETE = 1
 
-class VoltageRange(object):
+class VoltageRange:
     """Unit voltage ranges"""
 
     RANGE_2500_MV = 0
@@ -291,7 +291,7 @@ class VoltageRange(object):
 
         return cls.voltages[vrange]
 
-class InputType(object):
+class InputType:
     """Unit input types"""
 
     DIFFERENTIAL = 0
@@ -311,7 +311,7 @@ class InputType(object):
         # any integer value is valid, so in the spirit of duck-typing...
         return True
 
-class ConversionTime(object):
+class ConversionTime:
     """Unit conversion times"""
 
     TIME_60MS = 0
@@ -351,7 +351,7 @@ class ConversionTime(object):
 
         return cls.times[conversion_time]
 
-class SampleMethod(object):
+class SampleMethod:
     """Unit sample methods"""
 
     BLOCK = 0

@@ -55,7 +55,7 @@ class AdcConfig(BaseConfig):
         # retriever settings
         self['fetch'] = {
             # time to wait between ADC polls (ms)
-            'poll_time': '10000'
+            'poll_time': '500'
         }
 
         # library paths
